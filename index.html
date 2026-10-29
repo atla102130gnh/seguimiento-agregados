@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<!--
+  ============================================================================
+  Seguimiento de Carta de Agregados
+  ----------------------------------------------------------------------------
+  Altas, bajas, cambios y consultas de servicios agregados.
+  Base de datos: Supabase · Publicación: GitHub Pages
+
+  Archivos:
+    index.html              → estructura (esta página)
+    css/fonts.css           → tipografía Plus Jakarta Sans incrustada
+    css/styles.css          → estilos y modo claro/oscuro
+    config.js               → URL y llave pública de Supabase (lo llenas tú)
+    vendor/                 → Supabase JS y SheetJS (copias locales, versión fija)
+    js/excel-respaldo.js    → genera el Excel con el formato original
+    js/app.js               → lógica del sistema
+  ============================================================================
+-->
+<html lang="es-MX" class="dark" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Seguimiento de Agregados</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect x='1' y='1' width='38' height='38' rx='11' fill='%237c3aed'/%3E%3Cpath d='M12 21l5 5 11-12' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+
+  <!-- Tema antes de pintar (evita parpadeo). Por defecto: oscuro -->
+  <script>
+    (function () {
+      var t = 'dark';
+      try { t = localStorage.getItem('agr-theme') || 'dark'; } catch (e) {}
+      document.documentElement.setAttribute('data-theme', t);
+      document.documentElement.classList.toggle('dark', t === 'dark');
+    })();
+  </script>
+
+  <link rel="stylesheet" href="css/fonts.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- ===================== ÍCONOS ===================== -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+      <symbol id="i-truck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></symbol>
+      <symbol id="i-undo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+      <symbol id="i-history" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></symbol>
+      <symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+      <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m7 10 5 5 5-5"/></symbol>
+      <symbol id="i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></symbol>
+      <symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m10 6 6 6-6 6"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+      <symbol id="i-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4"/></symbol>
+      <symbol id="i-table" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><path d="M3.5 10h17M3.5 15h17M10 10v9.5"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+      <symbol id="i-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></symbol>
+      <symbol id="i-flag" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v6M12 17h.01"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 4.2 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0Z"/><path d="M12 10v4M12 17h.01"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.5-4.5L4 8"/><path d="M4 4v4h4M4 13a8 8 0 0 0 14.5 4.5L20 16"/><path d="M20 20v-4h-4"/></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16l-6 8v5l-4 2v-7L4 5Z"/></symbol>
+    </defs>
+  </svg>
+
+  <!-- ===================== LOGIN ===================== -->
+  <section id="login" class="login" hidden>
+    <div class="card login-card">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+          <rect x="1" y="1" width="38" height="38" rx="11" fill="var(--accent)" />
+          <path d="M12 21l5 5 11-12" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <div>
+          <h1 class="brand-title">Seguimiento de Agregados</h1>
+          <p class="brand-sub">Inicia sesión para continuar</p>
+        </div>
+      </div>
+      <form id="login-form" novalidate>
+        <div>
+          <label class="label" for="login-email">Correo</label>
+          <input id="login-email" class="field" type="email" autocomplete="username" required />
+        </div>
+        <div>
+          <label class="label" for="login-pass">Contraseña</label>
+          <input id="login-pass" class="field" type="password" autocomplete="current-password" required />
+        </div>
+        <div id="login-error" class="notice bad" hidden></div>
+        <button class="btn-primary" type="submit" id="login-btn">Iniciar sesión</button>
+      </form>
+      <p class="login-foot">¿No tienes acceso? Pídele al administrador que te dé de alta.</p>
+    </div>
+  </section>
+
+  <!-- ===================== CONFIGURACIÓN PENDIENTE ===================== -->
+  <section id="setup" class="login" hidden>
+    <div class="card login-card">
+      <h1 class="card-title">Falta configurar la conexión</h1>
+      <p class="card-hint mt-8">Abre <b>config.js</b> y escribe la <b>URL del proyecto</b> y la <b>llave pública (anon / publishable)</b> de Supabase. Las encuentras en Supabase → Project Settings → API.</p>
+    </div>
+  </section>
+
+  <!-- ===================== APLICACIÓN ===================== -->
+  <div id="app" class="shell" hidden>
+    <header class="topbar">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true">
+          <rect x="1" y="1" width="38" height="38" rx="11" fill="var(--accent)" />
+          <path d="M12 21l5 5 11-12" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <div>
+          <h1 class="brand-title">Seguimiento de Agregados</h1>
+          <p class="brand-sub">Carta de agregados · servicios surtidos</p>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="Secciones">
+        <a class="tab" href="#consulta" data-view="consulta"><svg><use href="#i-table"/></svg>Consulta<span class="count" id="nav-vencidos" hidden></span></a>
+        <a class="tab" href="#nuevo" data-view="nuevo"><svg><use href="#i-plus"/></svg>Nuevo agregado</a>
+        <a class="tab" href="#catalogos" data-view="catalogos"><svg><use href="#i-list"/></svg>Catálogos</a>
+        <a class="tab" href="#correos" data-view="correos"><svg><use href="#i-mail"/></svg>Correos y respaldo</a>
+      </nav>
+
+      <div class="user-menu">
+        <span class="avatar" id="user-avatar" title=""></span>
+        <button id="theme-toggle" class="icon-btn" type="button" aria-label="Cambiar tema" title="Cambiar tema">
+          <svg class="ic-sun"><use href="#i-sun"/></svg>
+        </button>
+        <button id="logout" class="icon-btn" type="button" aria-label="Cerrar sesión" title="Cerrar sesión"><svg><use href="#i-logout"/></svg></button>
+      </div>
+    </header>
+
+    <main>
+      <!-- ============ CONSULTA ============ -->
+      <section id="view-consulta" class="view" data-view="consulta" hidden>
+        <div class="card">
+          <div class="kpis" role="group" aria-label="Resumen y filtro rápido">
+            <button class="kpi" type="button" data-kpi="todos" aria-pressed="false">
+              <div class="kpi-value" id="k-total">–</div>
+              <div class="kpi-label">Registros del año</div>
+            </button>
+            <button class="kpi ok" type="button" data-kpi="COMPLETADO" aria-pressed="false">
+              <div class="kpi-value" id="k-ok">–</div>
+              <div class="kpi-label"><i style="background:var(--ok)"></i>Completados</div>
+            </button>
+            <button class="kpi warn" type="button" data-kpi="EN TIEMPO" aria-pressed="false">
+              <div class="kpi-value" id="k-warn">–</div>
+              <div class="kpi-label"><i style="background:var(--warn)"></i>En tiempo (≤ 4 días)</div>
+            </button>
+            <button class="kpi bad" type="button" data-kpi="CAMBIO DE ESTATUS OPERACIONES" aria-pressed="false">
+              <div class="kpi-value" id="k-bad">–</div>
+              <div class="kpi-label"><i style="background:var(--bad)"></i>Requieren actualización</div>
+            </button>
+          </div>
+          <div class="meter" aria-hidden="true"><span class="m-ok" id="m-ok"></span><span class="m-warn" id="m-warn"></span><span class="m-bad" id="m-bad"></span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-pad" style="padding-bottom:16px">
+            <div class="filters">
+              <div class="search">
+                <label class="sr-only" for="f-q">Buscar</label>
+                <svg><use href="#i-search"/></svg>
+                <input id="f-q" class="field" type="search" placeholder="Buscar NUR, CPT, descripción o contrarrecibo" autocomplete="off" />
+              </div>
+              <div><label class="label" for="f-anio">Año surtido</label><select id="f-anio" class="field"></select></div>
+              <div><label class="label">Cliente</label><div class="combo" data-filter="cliente_id" data-catalog="clientes"></div></div>
+              <div><label class="label">Proveedor</label><div class="combo" data-filter="proveedor_id" data-catalog="proveedores"></div></div>
+              <div><label class="label" for="f-estatus">Estatus</label>
+                <select id="f-estatus" class="field">
+                  <option value="">Todos</option>
+                  <option value="CARGADO">Cargado</option>
+                  <option value="PENDIENTE">Pendiente</option>
+                  <option value="ACLARACIÓN SERVICIO NO BRINDADO">Aclaración servicio no brindado</option>
+                </select>
+              </div>
+            </div>
+            <div class="filters-more" id="filters-more" hidden>
+              <div><label class="label">Tipo de servicio</label><div class="combo" data-filter="tipo_servicio_id" data-catalog="tipos_servicio"></div></div>
+              <div><label class="label">Solicitante</label><div class="combo" data-filter="solicitante_id" data-catalog="solicitantes"></div></div>
+              <div><label class="label" for="f-ops">Estatus operaciones</label>
+                <select id="f-ops" class="field">
+                  <option value="">Todos</option>
+                  <option value="COMPLETADO">Completado</option>
+                  <option value="EN TIEMPO">En tiempo</option>
+                  <option value="CAMBIO DE ESTATUS OPERACIONES">Cambio de estatus operaciones</option>
+                </select>
+              </div>
+              <div><label class="label">Solicitud desde</label><div class="date" data-date="f-desde"></div></div>
+              <div><label class="label">Solicitud hasta</label><div class="date" data-date="f-hasta"></div></div>
+            </div>
+            <div class="toolbar mt-12">
+              <button class="btn-ghost btn-sm" type="button" id="btn-more"><svg><use href="#i-filter"/></svg><span>Más filtros</span></button>
+              <label class="chip-toggle"><input type="checkbox" id="f-revision" /> Requieren revisión</label>
+              <label class="chip-toggle"><input type="checkbox" id="f-bajas" /> Mostrar bajas</label>
+              <button class="btn-ghost btn-sm" type="button" id="btn-clear" hidden><svg><use href="#i-x"/></svg>Limpiar filtros</button>
+              <span class="grow"></span>
+              <button class="icon-btn" type="button" id="btn-refresh" title="Actualizar" aria-label="Actualizar"><svg><use href="#i-refresh"/></svg></button>
+              <button class="btn-ghost btn-sm" type="button" id="btn-export"><svg><use href="#i-download"/></svg>Exportar a Excel</button>
+              <a class="btn-primary btn-sm" href="#nuevo"><svg><use href="#i-plus"/></svg>Nuevo agregado</a>
+            </div>
+          </div>
+
+          <div class="table-wrap" id="table-wrap">
+            <table class="grid" id="grid">
+              <thead><tr id="grid-head"></tr></thead>
+              <tbody id="grid-body"></tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <span id="pager-info" class="num">–</span>
+            <div class="pages">
+              <label class="sr-only" for="page-size">Registros por página</label>
+              <select id="page-size" class="field btn-sm" style="min-height:32px;width:auto;padding:4px 30px 4px 10px">
+                <option value="25">25 por página</option>
+                <option value="50" selected>50 por página</option>
+                <option value="100">100 por página</option>
+              </select>
+              <button class="icon-btn sm" type="button" id="pg-prev" aria-label="Página anterior"><svg><use href="#i-left"/></svg></button>
+              <span id="pg-label" class="num">–</span>
+              <button class="icon-btn sm" type="button" id="pg-next" aria-label="Página siguiente"><svg><use href="#i-right"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ NUEVO AGREGADO ============ -->
+      <section id="view-nuevo" class="view" data-view="nuevo" hidden>
+        <div class="card card-pad">
+          <div class="card-head">
+            <div>
+              <h2 class="card-title">Nuevo agregado</h2>
+              <p class="card-hint">Todos los campos con <span style="color:var(--bad)">*</span> son obligatorios. Al guardar se conservan cliente, proveedor, solicitante, tipo, contrarrecibo y fecha para capturar el siguiente estudio más rápido.</p>
+            </div>
+          </div>
+          <div id="form-nuevo" class="mt-16"></div>
+        </div>
+      </section>
+
+      <!-- ============ CATÁLOGOS ============ -->
+      <section id="view-catalogos" class="view" data-view="catalogos" hidden>
+        <div class="cat-layout">
+          <div class="card side-list" id="cat-side" role="tablist" aria-label="Catálogos"></div>
+          <div class="card">
+            <div class="card-pad">
+              <div class="card-head">
+                <div>
+                  <h2 class="card-title" id="cat-title">Catálogo</h2>
+                  <p class="card-hint">Lo que des de alta aquí aparece en las listas del formulario. Nada se borra: desactiva lo que ya no se use.</p>
+                </div>
+              </div>
+              <form class="cat-add mt-16" id="cat-add">
+                <label class="sr-only" for="cat-new">Nombre nuevo</label>
+                <input id="cat-new" class="field" placeholder="Nombre nuevo" autocomplete="off" />
+                <button class="btn-primary" type="submit"><svg><use href="#i-plus"/></svg>Dar de alta</button>
+              </form>
+              <div id="cat-dup" class="notice warn mt-8" hidden></div>
+              <div class="search mt-12">
+                <label class="sr-only" for="cat-q">Buscar en el catálogo</label>
+                <svg><use href="#i-search"/></svg>
+                <input id="cat-q" class="field" type="search" placeholder="Buscar" autocomplete="off" />
+              </div>
+            </div>
+            <ul class="cat-rows" id="cat-rows"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ CORREOS Y RESPALDO ============ -->
+      <section id="view-correos" class="view" data-view="correos" hidden>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-pad">
+              <h2 class="card-title">Destinatarios de los correos</h2>
+              <p class="card-hint">Escribe aquí a quién le llega cada correo. Puedes agregar a las personas que necesites y elegir si reciben la alerta diaria, el respaldo del viernes o ambos.</p>
+              <form class="form-grid mt-16" id="mail-add" novalidate>
+                <div class="col-4"><label class="label" for="mail-name">Nombre <span class="req">*</span></label><input id="mail-name" class="field" autocomplete="off" /></div>
+                <div class="col-6"><label class="label" for="mail-email">Correo <span class="req">*</span></label><input id="mail-email" class="field" type="email" autocomplete="off" /></div>
+                <div class="col-2" style="display:flex;align-items:end"><button class="btn-primary" type="submit" style="width:100%"><svg><use href="#i-plus"/></svg>Agregar</button></div>
+              </form>
+              <div id="mail-error" class="notice bad mt-8" hidden></div>
+            </div>
+            <div id="mail-rows"></div>
+          </div>
+
+          <div style="display:grid;gap:16px">
+            <div class="card card-pad">
+              <h2 class="card-title">Alerta diaria</h2>
+              <p class="card-hint">De lunes a viernes a las 9:00 am se envía un correo con las solicitudes que llevan <b>más de 4 días</b> sin fecha de carga.</p>
+              <div class="live-status mt-12"><span class="badge bad" id="alert-count">–</span><span>solicitudes entrarían hoy en la alerta.</span><a class="linkish" href="#consulta" id="alert-see">Ver</a></div>
+            </div>
+            <div class="card card-pad">
+              <h2 class="card-title">Respaldo en Excel</h2>
+              <p class="card-hint">Cada viernes a las 5:00 pm se genera el Excel con el mismo formato del archivo original y se envía por correo. También puedes descargarlo ahora.</p>
+              <ol class="steps mt-12">
+                <li><span><b>Una hoja por año surtido</b> (AGREGADOS 2026, AGREGADOS 2027…).</span></li>
+                <li><span><b>NUR y contrarrecibo como texto</b>, para que Excel no los convierta a notación científica.</span></li>
+                <li><span><b>Hojas extra</b>: bajas con su motivo, registros por revisar, catálogos y resumen.</span></li>
+              </ol>
+              <button class="btn-primary mt-16" type="button" id="btn-backup" style="width:100%"><svg><use href="#i-download"/></svg>Descargar respaldo ahora</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ===================== PLANTILLA DEL FORMULARIO (alta y edición) ===================== -->
+  <template id="tpl-form">
+    <form class="form-grid" novalidate autocomplete="off">
+      <div class="form-section">Servicio</div>
+      <div class="col-3" data-wrap="anio_surtido"><label class="label">Año surtido <span class="req">*</span></label><select class="field" data-f="anio_surtido"></select></div>
+      <div class="col-3" data-wrap="cliente_id"><label class="label">Cliente <span class="req">*</span></label><div class="combo" data-f="cliente_id" data-catalog="clientes" data-add="1"></div></div>
+      <div class="col-6" data-wrap="proveedor_id"><label class="label">Proveedor <span class="req">*</span></label><div class="combo" data-f="proveedor_id" data-catalog="proveedores" data-add="1"></div></div>
+
+      <div class="col-4" data-wrap="tipo_servicio_id"><label class="label">Tipo de servicio <span class="req">*</span></label>
+        <div class="field-wrap ac"><input class="field ac-input" data-f="tipo_servicio" placeholder="Escribe y presiona Enter" spellcheck="false" /></div>
+        <p class="ac-hint">Completa como Excel: escribe, y <kbd>Enter</kbd> o <kbd>Tab</kbd> acepta la sugerencia.</p>
+      </div>
+      <div class="col-4" data-wrap="solicitante_id"><label class="label">Solicitante <span class="req">*</span></label><div class="combo" data-f="solicitante_id" data-catalog="solicitantes" data-add="1"></div></div>
+      <div class="col-4" data-wrap="contrarrecibo"><label class="label">Contrarrecibo <span class="req">*</span></label><input class="field mono" data-f="contrarrecibo" inputmode="numeric" maxlength="20" placeholder="Solo números" /></div>
+
+      <div class="form-section">Estudio</div>
+      <div class="col-4" data-wrap="nur"><label class="label">NUR <span class="req">*</span></label><input class="field mono" data-f="nur" inputmode="numeric" maxlength="20" placeholder="Solo números" /></div>
+      <div class="col-4" data-wrap="cpt"><label class="label">CPT <span class="req">*</span></label><input class="field mono" data-f="cpt" maxlength="40" /></div>
+      <div class="col-12" data-wrap="descripcion"><label class="label">Descripción <span class="req">*</span></label><input class="field" data-f="descripcion" maxlength="400" /></div>
+
+      <div class="form-section">Seguimiento</div>
+      <div class="col-3" data-wrap="fecha_solicitud"><label class="label">Fecha de solicitud <span class="req">*</span></label><div class="date" data-f="fecha_solicitud"></div></div>
+      <div class="col-3" data-wrap="fecha_carga"><label class="label">Fecha de carga</label><div class="date" data-f="fecha_carga"></div></div>
+      <div class="col-6" data-wrap="estatus"><label class="label">Estatus</label>
+        <select class="field" data-f="estatus">
+          <option value="PENDIENTE">PENDIENTE</option>
+          <option value="ACLARACIÓN SERVICIO NO BRINDADO">ACLARACIÓN SERVICIO NO BRINDADO</option>
+          <option value="CARGADO" disabled title="Se asigna al capturar la fecha de carga">CARGADO</option>
+        </select>
+      </div>
+      <div class="col-12" data-wrap="notas"><label class="label">Notas</label><textarea class="field" data-f="notas" rows="2" maxlength="1000" placeholder="Opcional"></textarea></div>
+
+      <div class="col-12 live-status" data-live></div>
+      <div class="col-12" data-revision hidden></div>
+      <div class="col-12" data-form-error hidden></div>
+      <div class="col-12 form-actions" data-actions></div>
+    </form>
+  </template>
+
+  <!-- ===================== DIÁLOGOS ===================== -->
+  <dialog id="dlg-edit" aria-labelledby="dlg-edit-title">
+    <div class="dlg-head">
+      <div><h2 class="card-title" id="dlg-edit-title">Editar agregado</h2><p class="card-hint" id="dlg-edit-sub"></p></div>
+      <button class="icon-btn plain" type="button" data-close aria-label="Cerrar"><svg><use href="#i-x"/></svg></button>
+    </div>
+    <div class="dlg-body dlg-scroll" id="form-edit"></div>
+  </dialog>
+
+  <dialog id="dlg-carga" class="sm" aria-labelledby="dlg-carga-title">
+    <div class="dlg-head">
+      <div><h2 class="card-title" id="dlg-carga-title">Capturar fecha de carga</h2><p class="card-hint" id="dlg-carga-sub"></p></div>
+      <button class="icon-btn plain" type="button" data-close aria-label="Cerrar"><svg><use href="#i-x"/></svg></button>
+    </div>
+    <div class="dlg-body">
+      <label class="label">Fecha de carga <span class="req">*</span></label>
+      <div class="date" data-date="carga-fecha"></div>
+      <p class="field-error" id="carga-error" hidden></p>
+      <div class="live-status mt-12"><span>Quedará como</span><span class="badge ok">CARGADO</span><span class="badge ok">COMPLETADO</span></div>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn-ghost" type="button" data-close>Cancelar</button>
+      <button class="btn-primary" type="button" id="carga-save"><svg><use href="#i-check"/></svg>Marcar como cargado</button>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-baja" class="sm" aria-labelledby="dlg-baja-title">
+    <div class="dlg-head">
+      <div><h2 class="card-title" id="dlg-baja-title">Dar de baja</h2><p class="card-hint" id="dlg-baja-sub"></p></div>
+      <button class="icon-btn plain" type="button" data-close aria-label="Cerrar"><svg><use href="#i-x"/></svg></button>
+    </div>
+    <div class="dlg-body">
+      <div class="notice info"><svg><use href="#i-info"/></svg><span>El registro no se borra: queda oculto, conserva su historial y se puede reactivar.</span></div>
+      <label class="label mt-16" for="baja-motivo">Motivo de la baja <span class="req">*</span></label>
+      <textarea id="baja-motivo" class="field" rows="3" maxlength="500"></textarea>
+      <p class="field-error" id="baja-error" hidden>Escribe el motivo de la baja.</p>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn-ghost" type="button" data-close>Cancelar</button>
+      <button class="btn-danger" type="button" id="baja-save"><svg><use href="#i-trash"/></svg>Dar de baja</button>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-hist" aria-labelledby="dlg-hist-title">
+    <div class="dlg-head">
+      <div><h2 class="card-title" id="dlg-hist-title">Historial de cambios</h2><p class="card-hint" id="dlg-hist-sub"></p></div>
+      <button class="icon-btn plain" type="button" data-close aria-label="Cerrar"><svg><use href="#i-x"/></svg></button>
+    </div>
+    <div class="dlg-body dlg-scroll"><ul class="hist" id="hist-list"></ul></div>
+  </dialog>
+
+  <dialog id="dlg-confirm" class="sm" aria-labelledby="dlg-confirm-title">
+    <div class="dlg-head"><h2 class="card-title" id="dlg-confirm-title">Confirmar</h2></div>
+    <div class="dlg-body" id="dlg-confirm-body"></div>
+    <div class="dlg-foot">
+      <button class="btn-ghost" type="button" id="dlg-confirm-no">Cancelar</button>
+      <button class="btn-primary" type="button" id="dlg-confirm-yes">Continuar</button>
+    </div>
+  </dialog>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="vendor/supabase-2.45.4.js"></script>
+  <script src="vendor/xlsx-0.18.5.full.min.js"></script>
+  <script src="config.js"></script>
+  <script src="js/excel-respaldo.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

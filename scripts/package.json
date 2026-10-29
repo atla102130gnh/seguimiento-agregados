@@ -1,0 +1,15 @@
+{
+  "name": "agregados-automatizaciones",
+  "private": true,
+  "type": "module",
+  "description": "Alerta diaria de solicitudes vencidas y respaldo semanal en Excel",
+  "scripts": {
+    "alerta": "node alerta.mjs",
+    "respaldo": "node respaldo.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4",
+    "nodemailer": "6.9.16",
+    "xlsx": "0.18.5"
+  }
+}
