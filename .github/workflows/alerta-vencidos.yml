@@ -1,0 +1,35 @@
+name: Alerta diaria de solicitudes vencidas
+
+on:
+  schedule:
+    # Lunes a viernes 9:00 am hora de México (15:00 UTC)
+    - cron: '0 15 * * 1-5'
+  workflow_dispatch: {}
+
+concurrency:
+  group: alerta-vencidos
+  cancel-in-progress: false
+
+jobs:
+  alerta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install --no-audit --no-fund
+      - run: node alerta.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          APP_URL: ${{ vars.APP_URL }}
