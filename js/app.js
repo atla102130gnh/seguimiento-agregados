@@ -669,6 +669,83 @@
   }
 
   /* =========================================================================
+     4.4 COPIAR PARA CORREO
+     Copia CONTRARRECIBO · NUR · CPT · DESCRIPCION · TIPO DE SERVICIO como
+     tablita: al pegar en Outlook sale como tabla, y al pegar en Excel cada
+     dato cae en su celda (el NUR se queda como texto).
+     ========================================================================= */
+  var COPIA_ENC = ['CONTRARRECIBO', 'NUR', 'CPT', 'DESCRIPCION', 'TIPO DE SERVICIO'];
+  function copiaValores(r) { return [r.contrarrecibo || '', r.nur || '', r.cpt || '', r.descripcion || '', r.tipo_servicio || '']; }
+  function tablaCorreo(rows) {
+    var th = 'style="border:1px solid #808080;padding:3px 8px;background:#D9E1F2;font-weight:bold;text-align:left;white-space:nowrap"';
+    var td = 'style="border:1px solid #808080;padding:3px 8px;mso-number-format:\'\\@\';white-space:nowrap"';
+    var html = '<table style="border-collapse:collapse;font-family:Calibri,Arial,sans-serif;font-size:11pt">' +
+      '<tr>' + COPIA_ENC.map(function (h) { return '<th ' + th + '>' + esc(h) + '</th>'; }).join('') + '</tr>' +
+      rows.map(function (r) { return '<tr>' + copiaValores(r).map(function (v) { return '<td ' + td + '>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') +
+      '</table>';
+    var texto = COPIA_ENC.join('\t') + '\n' + rows.map(function (r) { return copiaValores(r).join('\t'); }).join('\n');
+    return { html: html, texto: texto };
+  }
+  async function alPortapapeles(html, texto) {
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([texto], { type: 'text/plain' })
+        })]);
+        return true;
+      }
+    } catch (e) { /* se intenta el método alterno */ }
+    var div = document.createElement('div');
+    div.contentEditable = 'true';
+    div.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    div.innerHTML = html;
+    capaPara(document.activeElement || document.body).appendChild(div);
+    var rango = document.createRange(); rango.selectNodeContents(div);
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rango);
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e2) { ok = false; }
+    sel.removeAllRanges(); div.remove();
+    return ok;
+  }
+  async function copiarParaCorreo(rows) {
+    if (!rows.length) return;
+    var t = tablaCorreo(rows);
+    var ok = await alPortapapeles(t.html, t.texto);
+    if (ok) toast('ok', rows.length === 1 ? 'Copiado para correo' : rows.length + ' registros copiados para correo', 'Pega con Ctrl + V en tu correo o en Excel.');
+    else toast('bad', 'No se pudo copiar', 'Tu navegador bloqueó el portapapeles. Inténtalo de nuevo.');
+  }
+
+  // Ícono y estilos de esta función (agregados desde aquí para no tocar otros archivos)
+  (function () {
+    var NS = 'http://www.w3.org/2000/svg', defs = document.querySelector('svg defs');
+    if (defs && !document.getElementById('i-copy')) {
+      var sym = document.createElementNS(NS, 'symbol');
+      sym.setAttribute('id', 'i-copy'); sym.setAttribute('viewBox', '0 0 24 24'); sym.setAttribute('fill', 'none');
+      sym.setAttribute('stroke', 'currentColor'); sym.setAttribute('stroke-width', '2'); sym.setAttribute('stroke-linecap', 'round'); sym.setAttribute('stroke-linejoin', 'round');
+      var r1 = document.createElementNS(NS, 'rect'); r1.setAttribute('x', '8.5'); r1.setAttribute('y', '8.5'); r1.setAttribute('width', '12'); r1.setAttribute('height', '12'); r1.setAttribute('rx', '2.5');
+      var p1 = document.createElementNS(NS, 'path'); p1.setAttribute('d', 'M15.5 8.5V5.5a2 2 0 0 0-2-2h-8a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h3');
+      sym.appendChild(r1); sym.appendChild(p1); defs.appendChild(sym);
+    }
+    var st = document.createElement('style');
+    st.textContent =
+      '.grid .c-sel{width:36px;padding-left:14px;padding-right:4px}' +
+      '.grid .c-sel input{width:16px;height:16px;margin:2px 0 0;accent-color:var(--accent);cursor:pointer}' +
+      '.grid tr.is-selected td{background:var(--accent-soft)}' +
+      '.grid tr.is-selected td.c-actions{background:color-mix(in srgb,var(--card-solid) 80%,var(--accent))}' +
+      '.sel-bar{display:inline-flex;align-items:center;gap:6px;padding:3px 4px 3px 12px;border-radius:12px;background:var(--accent-soft);color:var(--accent-ink);font-size:12.5px;font-weight:650}' +
+      '.sel-bar .btn-primary{min-height:30px;padding:5px 11px;font-size:12.5px;border-radius:9px}' +
+      '.sesion{margin-top:18px;border:1px dashed var(--line-strong);border-radius:var(--r-md);padding:14px 16px}' +
+      '.sesion-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}' +
+      '.sesion-head b{font-size:13.5px}' +
+      '.sesion table{width:100%;margin-top:10px;border-collapse:collapse;font-size:12.5px}' +
+      '.sesion th{text-align:left;font-size:11px;color:var(--muted);padding:5px 8px;border-bottom:1px solid var(--line)}' +
+      '.sesion td{padding:6px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}' +
+      '.sesion tr:last-child td{border-bottom:0}';
+    document.head.appendChild(st);
+  })();
+
+  /* =========================================================================
      5. FORMULARIO DE AGREGADO (alta y edición)
      ========================================================================= */
   function Formulario(contenedor, cfg) {
@@ -765,7 +842,8 @@
     mayus(inCpt); mayus(inDesc);
     [inContra, inNur, inCpt, inDesc, inNotas].forEach(function (inp) {
       inp.addEventListener('input', function () { if (intentoGuardar) validar(); actualizarVivo(); });
-      inp.addEventListener('blur', function () { tocado[inp.dataset.f] = true; validar(); });
+      // Un campo vacío solo se marca en rojo al intentar guardar (así no se mueve la pantalla al pasar por él)
+      inp.addEventListener('blur', function () { if (limpiar(inp.value)) tocado[inp.dataset.f] = true; validar(); });
     });
 
     // --- Fechas
@@ -988,6 +1066,7 @@
       if (state.anios.indexOf(datos.anio_surtido) < 0) cargarCatalogos();
       if (modo === 'nuevo') {
         toast('ok', 'Agregado guardado', 'NUR ' + datos.nur + ' · ' + datos.cpt + (datos.fecha_carga ? ' · cargado' : ''));
+        if (cfg.onCreado) cfg.onCreado({ contrarrecibo: datos.contrarrecibo, nur: datos.nur, cpt: datos.cpt, descripcion: datos.descripcion, tipo_servicio: nombreDe('tipos_servicio', datos.tipo_servicio_id) });
         limpiarParaSiguiente();
       } else {
         toast('ok', 'Cambios guardados', 'NUR ' + datos.nur);
@@ -1057,7 +1136,7 @@
   function iniciarConsulta() {
     Q.anio = anioActual();
     // Encabezados ordenables
-    $('#grid-head').innerHTML = COLS.map(function (c) {
+    $('#grid-head').innerHTML = '<th class="c-sel"><input type="checkbox" id="sel-all" title="Seleccionar los de esta página" aria-label="Seleccionar todos los de esta página"></th>' + COLS.map(function (c) {
       return '<th class="' + (c.cls || '') + '" data-k="' + c.k + '"><button type="button">' + c.t + ' <span class="sort">↕</span></button></th>';
     }).join('') + '<th class="c-actions"><span class="sr-only">Acciones</span></th>';
     $('#grid-head').addEventListener('click', function (e) {
@@ -1150,7 +1229,7 @@
       if (on) th.setAttribute('aria-sort', Q.asc ? 'ascending' : 'descending'); else th.removeAttribute('aria-sort');
       $('.sort', th).textContent = on ? (Q.asc ? '↑' : '↓') : '↕';
     });
-    if (!filas.length) body.innerHTML = Array(8).join('<tr class="skeleton">' + Array(COLS.length + 2).join('<td><div></div></td>') + '</tr>');
+    if (!filas.length) body.innerHTML = Array(8).join('<tr class="skeleton">' + Array(COLS.length + 3).join('<td><div></div></td>') + '</tr>');
     var desde = Q.pagina * Q.tam;
     var q = aplicarFiltros(sb.from('v_agregados').select('*', { count: 'exact' }))
       .order(Q.orden, { ascending: Q.asc, nullsFirst: false })
@@ -1159,13 +1238,14 @@
     var r = await q;
     if (mio !== pedido) return;
     if (r.error) {
-      body.innerHTML = '<tr><td colspan="' + (COLS.length + 1) + '"><div class="empty"><strong>No se pudo consultar</strong>' + esc(mensajeError(r.error)) + '</div></td></tr>';
+      body.innerHTML = '<tr><td colspan="' + (COLS.length + 2) + '"><div class="empty"><strong>No se pudo consultar</strong>' + esc(mensajeError(r.error)) + '</div></td></tr>';
       return;
     }
     filas = r.data;
     var total = r.count || 0;
     if (!filas.length && Q.pagina > 0 && total > 0) { Q.pagina = Math.max(0, Math.ceil(total / Q.tam) - 1); return cargarTabla(); }
     pintarFilas();
+    pintarSeleccion();
     var paginas = Math.max(1, Math.ceil(total / Q.tam));
     $('#pager-info').textContent = total ? ('Mostrando ' + (desde + 1).toLocaleString('es-MX') + '–' + (desde + filas.length).toLocaleString('es-MX') + ' de ' + total.toLocaleString('es-MX')) : 'Sin registros';
     $('#pg-label').textContent = (Q.pagina + 1) + ' / ' + paginas;
@@ -1174,10 +1254,46 @@
     state.consultaSucia = false;
   }
 
+  // Selección para copiar varios a la vez (se conserva al cambiar de página o de búsqueda)
+  var seleccion = new Map();
+  function pintarSeleccion() {
+    var bar = $('#sel-bar');
+    if (!bar) {
+      bar = document.createElement('span');
+      bar.id = 'sel-bar'; bar.className = 'sel-bar'; bar.hidden = true;
+      bar.innerHTML = '<span data-n></span><button type="button" class="btn-primary" data-copiar>' + icon('i-copy') + 'Copiar para correo</button>' +
+        '<button type="button" class="icon-btn sm plain" data-limpiar-sel title="Quitar selección" aria-label="Quitar selección">' + icon('i-x') + '</button>';
+      $('#btn-refresh').parentNode.insertBefore(bar, $('#btn-refresh'));
+      $('[data-copiar]', bar).addEventListener('click', function () { copiarParaCorreo(Array.from(seleccion.values())); });
+      $('[data-limpiar-sel]', bar).addEventListener('click', function () { seleccion.clear(); pintarFilas(); pintarSeleccion(); });
+    }
+    var n = seleccion.size;
+    bar.hidden = !n;
+    $('[data-n]', bar).textContent = n + (n === 1 ? ' seleccionado' : ' seleccionados');
+    var todos = $('#sel-all');
+    if (todos) {
+      var enPagina = filas.filter(function (r) { return seleccion.has(r.id); }).length;
+      todos.checked = filas.length > 0 && enPagina === filas.length;
+      todos.indeterminate = enPagina > 0 && enPagina < filas.length;
+    }
+  }
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.id === 'sel-all') {
+      filas.forEach(function (r) { if (t.checked) seleccion.set(r.id, r); else seleccion.delete(r.id); });
+      pintarFilas(); pintarSeleccion();
+    } else if (t.dataset && t.dataset.sel != null && t.closest('#grid-body')) {
+      var r = filas[+t.dataset.sel]; if (!r) return;
+      if (t.checked) seleccion.set(r.id, r); else seleccion.delete(r.id);
+      t.closest('tr').classList.toggle('is-selected', t.checked);
+      pintarSeleccion();
+    }
+  });
+
   function pintarFilas() {
     var body = $('#grid-body');
     if (!filas.length) {
-      body.innerHTML = '<tr><td colspan="' + (COLS.length + 1) + '"><div class="empty"><strong>No hay registros con estos filtros</strong>' +
+      body.innerHTML = '<tr><td colspan="' + (COLS.length + 2) + '"><div class="empty"><strong>No hay registros con estos filtros</strong>' +
         (hayFiltros() ? '<button type="button" class="linkish" data-limpiar>Limpiar filtros</button>' : '<a class="linkish" href="#nuevo">Capturar un agregado</a>') + '</div></td></tr>';
       var bl = $('[data-limpiar]', body); if (bl) bl.onclick = limpiarFiltros;
       return;
@@ -1188,10 +1304,14 @@
         ? '<button class="icon-btn sm plain" data-a="hist" title="Historial" aria-label="Historial">' + icon('i-history') + '</button>' +
           '<button class="icon-btn sm plain ok" data-a="reactivar" title="Reactivar" aria-label="Reactivar">' + icon('i-undo') + '</button>'
         : (r.estatus !== ESTATUS.CARG ? '<button class="icon-btn sm plain ok" data-a="carga" title="Capturar fecha de carga" aria-label="Capturar fecha de carga">' + icon('i-truck') + '</button>' : '') +
+          '<button class="icon-btn sm plain" data-a="copiar" title="Copiar para correo" aria-label="Copiar para correo">' + icon('i-copy') + '</button>' +
           '<button class="icon-btn sm plain" data-a="editar" title="Editar" aria-label="Editar">' + icon('i-edit') + '</button>' +
           '<button class="icon-btn sm plain" data-a="hist" title="Historial" aria-label="Historial">' + icon('i-history') + '</button>' +
           '<button class="icon-btn sm plain bad" data-a="baja" title="Dar de baja" aria-label="Dar de baja">' + icon('i-trash') + '</button>';
-      return '<tr data-i="' + i + '"' + (r.eliminado ? ' class="is-deleted" title="' + esc('Baja: ' + (r.motivo_baja || '')) + '"' : '') + '>' +
+      var marcado = seleccion.has(r.id);
+      var clases = (r.eliminado ? 'is-deleted' : '') + (marcado ? ' is-selected' : '');
+      return '<tr data-i="' + i + '" class="' + clases.trim() + '"' + (r.eliminado ? ' title="' + esc('Baja: ' + (r.motivo_baja || '')) + '"' : '') + '>' +
+        '<td class="c-sel"><input type="checkbox" data-sel="' + i + '"' + (marcado ? ' checked' : '') + ' aria-label="Seleccionar NUR ' + esc(r.nur) + '"></td>' +
         '<td class="c-num">' + r.anio_surtido + '</td>' +
         '<td>' + esc(r.cliente) + '</td>' +
         '<td class="c-prov">' + esc(r.proveedor) + '</td>' +
@@ -1297,6 +1417,7 @@
     else if (a === 'baja') abrirBaja(r);
     else if (a === 'hist') abrirHistorial(r);
     else if (a === 'reactivar') reactivar(r);
+    else if (a === 'copiar') copiarParaCorreo([r]);
   }
 
   async function abrirEdicion(r) {
@@ -1572,6 +1693,30 @@
     cargando(btn, false);
   }
 
+  /* ---------- Capturados en esta sesión (para copiarlos juntos al correo) ---------- */
+  var capturados = [];
+  function iniciarNuevo() {
+    var panel = document.createElement('div');
+    panel.id = 'sesion'; panel.className = 'sesion'; panel.hidden = true;
+    $('#form-nuevo').parentNode.appendChild(panel);
+    panel.addEventListener('click', function (e) {
+      if (e.target.closest('[data-copiar-sesion]')) copiarParaCorreo(capturados);
+      if (e.target.closest('[data-vaciar-sesion]')) { capturados = []; pintarSesion(); }
+    });
+    Formulario($('#form-nuevo'), { modo: 'nuevo', onCreado: function (r) { capturados.push(r); pintarSesion(); } });
+  }
+  function pintarSesion() {
+    var panel = $('#sesion'); if (!panel) return;
+    panel.hidden = !capturados.length;
+    if (!capturados.length) { panel.innerHTML = ''; return; }
+    panel.innerHTML = '<div class="sesion-head"><b>Capturados en esta sesión: ' + capturados.length + '</b><span class="spacer"></span>' +
+      '<button type="button" class="btn-primary btn-sm" data-copiar-sesion>' + icon('i-copy') + 'Copiar tabla para correo</button>' +
+      '<button type="button" class="btn-ghost btn-sm" data-vaciar-sesion>Vaciar lista</button></div>' +
+      '<div style="overflow-x:auto"><table><tr>' + COPIA_ENC.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr>' +
+      capturados.map(function (r) { return '<tr>' + copiaValores(r).map(function (v) { return '<td>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') +
+      '</table></div><p class="card-hint mt-8">La lista se vacía al cerrar o recargar la página. Lo guardado ya está en la base.</p>';
+  }
+
   /* =========================================================================
      10. NAVEGACIÓN Y ARRANQUE
      ========================================================================= */
@@ -1587,7 +1732,7 @@
       if (!state.iniciado.consulta) { state.iniciado.consulta = true; iniciarConsulta(); recargar(); }
       else if (state.consultaSucia) recargar();
     } else if (v === 'nuevo') {
-      if (!state.iniciado.nuevo) { state.iniciado.nuevo = true; Formulario($('#form-nuevo'), { modo: 'nuevo' }); }
+      if (!state.iniciado.nuevo) { state.iniciado.nuevo = true; iniciarNuevo(); }
       setTimeout(function () { var b = $('#form-nuevo .combo-btn'); if (b) b.focus(); }, 30);
     } else if (v === 'catalogos') {
       if (!state.iniciado.catalogos) { state.iniciado.catalogos = true; iniciarCatalogos(); }
