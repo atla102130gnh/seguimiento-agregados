@@ -219,11 +219,13 @@
   // Solo los administradores ven "Correos y respaldo" (la base también lo protege)
   async function revisarAdmin() {
     var r = await sb.rpc('es_admin');
-    if (r.error) {
-      // Si todavía no se corre 03_administrador_correos.sql, se mantiene como antes
-      state.admin = /es_admin|PGRST202|function/i.test((r.error.code || '') + ' ' + (r.error.message || ''));
-    } else {
+    if (!r.error) {
       state.admin = r.data === true;
+    } else {
+      // Si no se pudo preguntar, decide la propia base: solo un administrador
+      // puede leer los destinatarios (a los demás les regresa la lista vacía).
+      var d = await sb.from('destinatarios_alerta').select('id').limit(1);
+      state.admin = !d.error && d.data.length > 0;
     }
     var tab = $('.nav .tab[data-view="correos"]');
     if (tab) tab.hidden = !state.admin;
