@@ -157,6 +157,7 @@
     byId: { clientes: {}, proveedores: {}, solicitantes: {}, tipos_servicio: {} },
     anios: [],
     iniciado: {},
+    admin: false,
     consultaSucia: true
   };
   var CATALOGOS = [
@@ -204,6 +205,7 @@
     var av = $('#user-avatar');
     av.textContent = email.slice(0, 2).toUpperCase();
     av.title = email;
+    await revisarAdmin();
     mostrar('app');
     try {
       await cargarCatalogos();
@@ -212,6 +214,19 @@
     }
     enrutar();
     actualizarContadorNav();
+  }
+
+  // Solo los administradores ven "Correos y respaldo" (la base también lo protege)
+  async function revisarAdmin() {
+    var r = await sb.rpc('es_admin');
+    if (r.error) {
+      // Si todavía no se corre 03_administrador_correos.sql, se mantiene como antes
+      state.admin = /es_admin|PGRST202|function/i.test((r.error.code || '') + ' ' + (r.error.message || ''));
+    } else {
+      state.admin = r.data === true;
+    }
+    var tab = $('.nav .tab[data-view="correos"]');
+    if (tab) tab.hidden = !state.admin;
   }
 
   /* =========================================================================
@@ -1725,6 +1740,7 @@
     if ($('#app').hidden) return;
     var v = (location.hash || '').replace('#', '');
     if (VISTAS.indexOf(v) < 0) v = 'consulta';
+    if (v === 'correos' && !state.admin) { v = 'consulta'; if (location.hash !== '#consulta') history.replaceState(null, '', '#consulta'); }
     cerrarPop();
     $$('.view').forEach(function (s) { s.hidden = s.dataset.view !== v; });
     $$('.nav .tab').forEach(function (t) { if (t.dataset.view === v) t.setAttribute('aria-current', 'page'); else t.removeAttribute('aria-current'); });
